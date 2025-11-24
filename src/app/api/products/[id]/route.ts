@@ -43,10 +43,10 @@ async function getCategoriesWithCache() {
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const productId = params.id;
+        const { id: productId } = await params;
 
         // Get the product
         const productResponse = await wcApi.get(`products/${productId}`);
@@ -149,8 +149,14 @@ export async function GET(
             categoryHierarchy: categoryInfo.fullHierarchy,
             categoryLabel: categoryInfo.label,
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error fetching product with categories:', error);
-        return NextResponse.json({ error: 'Failed to fetch product' }, { status: 500 });
+
+        // If WooCommerce API fails (404, etc), return error
+        // The frontend will use the fallback (original product without enrichment)
+        return NextResponse.json(
+            { error: 'Failed to fetch product details' },
+            { status: error.response?.status || 500 }
+        );
     }
 }

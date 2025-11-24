@@ -25,6 +25,8 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { id, customPrice, discountPrice, startDate, endDate, product } = body;
 
+        console.log('Saving product to DB:', JSON.stringify(product).substring(0, 200));
+
         const promotion = await prisma.promotion.create({
             data: {
                 id, // Use the ID provided by the client (UUID)
@@ -32,9 +34,12 @@ export async function POST(request: Request) {
                 discountPrice,
                 startDate,
                 endDate,
-                product: product as any, // Cast to any for JSONB
+                product: JSON.parse(JSON.stringify(product)), // Ensure proper serialization
             },
         });
+
+        console.log('Retrieved from DB:', JSON.stringify(promotion.product).substring(0, 200));
+
         return NextResponse.json(promotion);
     } catch (error) {
         console.error('Error creating promotion:', error);
