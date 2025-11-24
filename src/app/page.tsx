@@ -215,7 +215,7 @@ export default function Home() {
                       <div key={promo.id} className="flex items-center justify-between p-4 border rounded hover:bg-gray-50">
                         <div className="flex items-center gap-4">
                           <img
-                            src={promo.product.images[0]?.src}
+                            src={promo.product.images?.[0]?.src || 'https://placehold.co/300x300?text=No+Image'}
                             alt=""
                             className="w-12 h-12 object-contain"
                           />
