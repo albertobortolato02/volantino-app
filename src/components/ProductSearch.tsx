@@ -53,6 +53,24 @@ export default function ProductSearch({ onSelect }: ProductSearchProps) {
         return () => clearTimeout(timer);
     }, [query, handleSearch]);
 
+    const handleProductSelect = async (product: Product) => {
+        try {
+            // Fetch enriched product with categories
+            const res = await fetch(`/api/products/${product.id}`);
+            const enrichedProduct = await res.json();
+
+            onSelect(enrichedProduct);
+            setResults([]);
+            setQuery('');
+        } catch (error) {
+            console.error("Failed to fetch product details", error);
+            // Fallback to original product if enrichment fails
+            onSelect(product);
+            setResults([]);
+            setQuery('');
+        }
+    };
+
     return (
         <div className="w-full max-w-md space-y-4">
             <div className="relative">
@@ -77,11 +95,7 @@ export default function ProductSearch({ onSelect }: ProductSearchProps) {
                     {results.map((product) => (
                         <li
                             key={product.id}
-                            onClick={() => {
-                                onSelect(product);
-                                setResults([]);
-                                setQuery('');
-                            }}
+                            onClick={() => handleProductSelect(product)}
                             className="p-3 hover:bg-gray-50 cursor-pointer flex justify-between items-center"
                         >
                             <div>
