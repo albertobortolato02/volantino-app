@@ -28,13 +28,13 @@ export default function PromotionEditor({ product, initialValues, onSave, onCanc
     useEffect(() => {
         if (product) {
             if (initialValues) {
-                setCustomPrice(initialValues.customPrice || product.regular_price || product.price);
-                setDiscountPrice(initialValues.discountPrice || product.price);
+                setCustomPrice(initialValues.customPrice || product.regular_price || product.price || '');
+                setDiscountPrice(initialValues.discountPrice || product.price || '');
                 setStartDate(initialValues.startDate || '');
                 setEndDate(initialValues.endDate || '');
             } else {
-                setCustomPrice(product.regular_price || product.price);
-                setDiscountPrice(product.price);
+                setCustomPrice(product.regular_price || product.price || '');
+                setDiscountPrice(product.price || '');
                 setStartDate('');
                 setEndDate('');
             }
