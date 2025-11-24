@@ -67,7 +67,95 @@ export async function GET(request: Request) {
             status: 'publish',
         });
 
-        return NextResponse.json(response.data);
+        const products = response.data;
+
+        // If we have products and they have categories, enrich them with basic category info
+        if (products.length > 0 && products.some((p: any) => p.categories?.length > 0)) {
+            try {
+                // Dynamically import to avoid circular dependencies
+                const { getCachedCategories } = await import('@/lib/categoryCache');
+                const allCategories = await getCachedCategories();
+
+                // Build category map
+                const categoryMap = new Map<number, { id: number; name: string; parent: number }>();
+                allCategories.forEach((cat: any) => {
+                    categoryMap.set(cat.id, {
+                        id: cat.id,
+                        name: cat.name,
+                        parent: cat.parent || 0,
+                    });
+                });
+
+                // Helper to get category label (root > level1)
+                const getCategoryLabel = (categoryId: number): string => {
+                    const pathParts: string[] = [];
+                    let currentId = categoryId;
+                    const visited = new Set<number>();
+                    let depth = 0;
+
+                    // Traverse up the parent chain (max 2 levels for label)
+                    while (currentId && currentId !== 0 && depth < 3) {
+                        if (visited.has(currentId)) break;
+                        visited.add(currentId);
+
+                        const cat = categoryMap.get(currentId);
+                        if (!cat) break;
+
+                        pathParts.unshift(cat.name);
+                        currentId = cat.parent;
+                        depth++;
+                    }
+
+                    if (pathParts.length >= 2) {
+                        return `${pathParts[0]} > ${pathParts[1]}`;
+                    }
+                    return pathParts[0] || '';
+                };
+
+                // Enrich each product with categoryLabel
+                products.forEach((product: any) => {
+                    if (product.categories && product.categories.length > 0) {
+                        // Find deepest category
+                        let deepestCategoryId: number | null = null;
+                        let maxDepth = -1;
+
+                        product.categories.forEach((cat: any) => {
+                            const fullCat = categoryMap.get(cat.id);
+                            if (!fullCat) return;
+
+                            let depth = 0;
+                            let currentId = fullCat.id;
+                            const visited = new Set<number>();
+
+                            while (currentId && currentId !== 0 && depth < 10) {
+                                if (visited.has(currentId)) break;
+                                visited.add(currentId);
+
+                                const current = categoryMap.get(currentId);
+                                if (!current) break;
+
+                                depth++;
+                                currentId = current.parent;
+                            }
+
+                            if (depth > maxDepth) {
+                                maxDepth = depth;
+                                deepestCategoryId = fullCat.id;
+                            }
+                        });
+
+                        if (deepestCategoryId) {
+                            product.categoryLabel = getCategoryLabel(deepestCategoryId);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error enriching products with categories:', error);
+                // Continue without enrichment
+            }
+        }
+
+        return NextResponse.json(products);
     } catch (error) {
         console.error("WooCommerce API Error:", error);
         // Fallback to mock data on error

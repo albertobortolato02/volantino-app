@@ -1,45 +1,6 @@
 import { NextResponse } from 'next/server';
 import { wcApi } from '@/lib/woocommerce';
-
-// Category cache with 1-hour TTL
-let categoryCache: { data: any[]; timestamp: number } | null = null;
-const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
-
-async function getCategoriesWithCache() {
-    const now = Date.now();
-
-    // Return cached data if valid
-    if (categoryCache && (now - categoryCache.timestamp) < CACHE_TTL) {
-        return categoryCache.data;
-    }
-
-    // Fetch all categories
-    let allCategories: any[] = [];
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore) {
-        const categoriesResponse = await wcApi.get("products/categories", {
-            per_page: 100,
-            page: page,
-        });
-
-        if (categoriesResponse.data.length === 0) {
-            hasMore = false;
-        } else {
-            allCategories = allCategories.concat(categoriesResponse.data);
-            page++;
-        }
-    }
-
-    // Update cache
-    categoryCache = {
-        data: allCategories,
-        timestamp: now
-    };
-
-    return allCategories;
-}
+import { getCachedCategories } from '@/lib/categoryCache';
 
 export async function GET(
     request: Request,
@@ -52,8 +13,8 @@ export async function GET(
         const productResponse = await wcApi.get(`products/${productId}`);
         const product = productResponse.data;
 
-        // Get categories (from cache if available)
-        const allCategories = await getCategoriesWithCache();
+        // Get categories (from persistent cache)
+        const allCategories = await getCachedCategories();
 
         // Build category map
         const categoryMap = new Map<number, { id: number; name: string; parent: number }>();
