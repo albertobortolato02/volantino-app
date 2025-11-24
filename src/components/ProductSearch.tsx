@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search } from 'lucide-react';
 
 export interface Product {
@@ -27,11 +27,14 @@ export default function ProductSearch({ onSelect }: ProductSearchProps) {
     const [results, setResults] = useState<Product[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const handleSearch = async () => {
-        if (!query) return;
+    const handleSearch = useCallback(async (searchQuery: string) => {
+        if (!searchQuery || searchQuery.length < 2) {
+            setResults([]);
+            return;
+        }
         setLoading(true);
         try {
-            const res = await fetch(`/api/products?search=${encodeURIComponent(query)}`);
+            const res = await fetch(`/api/products?search=${encodeURIComponent(searchQuery)}`);
             const data = await res.json();
             setResults(data);
         } catch (error) {
@@ -39,26 +42,34 @@ export default function ProductSearch({ onSelect }: ProductSearchProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    // Debounce search with 500ms delay
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            handleSearch(query);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [query, handleSearch]);
 
     return (
         <div className="w-full max-w-md space-y-4">
-            <div className="flex gap-2">
+            <div className="relative">
                 <input
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="Cerca per nome o SKU..."
-                    className="flex-1 p-2 border rounded-md"
+                    placeholder="Cerca per nome o SKU (min 2 caratteri)..."
+                    className="w-full p-2 pr-10 border rounded-md"
                 />
-                <button
-                    onClick={handleSearch}
-                    disabled={loading}
-                    className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                >
-                    <Search size={20} />
-                </button>
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {loading ? (
+                        <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                    ) : (
+                        <Search size={20} className="text-gray-400" />
+                    )}
+                </div>
             </div>
 
             {results.length > 0 && (

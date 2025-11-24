@@ -54,30 +54,54 @@ const MOCK_PRODUCTS = [
     }
 ];
 
+// Category cache with 1-hour TTL
+let categoryCache: { data: any[]; timestamp: number } | null = null;
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
+
+async function getCategoriesWithCache() {
+    const now = Date.now();
+
+    // Return cached data if valid
+    if (categoryCache && (now - categoryCache.timestamp) < CACHE_TTL) {
+        return categoryCache.data;
+    }
+
+    // Fetch all categories
+    let allCategories: any[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+        const categoriesResponse = await wcApi.get("products/categories", {
+            per_page: 100,
+            page: page,
+        });
+
+        if (categoriesResponse.data.length === 0) {
+            hasMore = false;
+        } else {
+            allCategories = allCategories.concat(categoriesResponse.data);
+            page++;
+        }
+    }
+
+    // Update cache
+    categoryCache = {
+        data: allCategories,
+        timestamp: now
+    };
+
+    return allCategories;
+}
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
 
     // Try to fetch from WooCommerce
     try {
-        // First, get all categories to build the map
-        let allCategories: any[] = [];
-        let page = 1;
-        let hasMore = true;
-
-        while (hasMore) {
-            const categoriesResponse = await wcApi.get("products/categories", {
-                per_page: 100,
-                page: page,
-            });
-
-            if (categoriesResponse.data.length === 0) {
-                hasMore = false;
-            } else {
-                allCategories = allCategories.concat(categoriesResponse.data);
-                page++;
-            }
-        }
+        // Get categories (from cache if available)
+        const allCategories = await getCategoriesWithCache();
 
         // Build category map
         const categoryMap = new Map<number, { id: number; name: string; parent: number }>();
@@ -120,7 +144,7 @@ export async function GET(request: Request) {
         // Get products
         const response = await wcApi.get("products", {
             search,
-            per_page: 20,
+            per_page: 50, // Increased from 20
             status: 'publish',
         });
 
