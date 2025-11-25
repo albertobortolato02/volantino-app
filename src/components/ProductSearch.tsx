@@ -53,36 +53,11 @@ export default function ProductSearch({ onSelect }: ProductSearchProps) {
         return () => clearTimeout(timer);
     }, [query, handleSearch]);
 
-    const handleProductSelect = async (product: Product) => {
-        try {
-            // Check if product already has categoryLabel (enriched from search)
-            if (product.categoryLabel) {
-                // Product is already enriched, use it directly
-                onSelect(product);
-                setResults([]);
-                setQuery('');
-                return;
-            }
-
-            // Need to enrich - fetch detailed product with categories
-            const res = await fetch(`/api/products/${product.id}`);
-
-            if (!res.ok) {
-                throw new Error('Failed to fetch product details');
-            }
-
-            const enrichedProduct = await res.json();
-
-            onSelect(enrichedProduct);
-            setResults([]);
-            setQuery('');
-        } catch (error) {
-            console.error("Failed to fetch product details", error);
-            // Fallback to original product if enrichment fails
-            onSelect(product);
-            setResults([]);
-            setQuery('');
-        }
+    const handleProductSelect = (product: Product) => {
+        // Use product directly from search results (fast)
+        onSelect(product);
+        setResults([]);
+        setQuery('');
     };
 
     return (

@@ -19,10 +19,62 @@ export default function Home() {
   const [promoToDelete, setPromoToDelete] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [isEnriching, setIsEnriching] = useState(false);
 
   useEffect(() => {
     fetchPromotions();
   }, []);
+
+  // Background enrichment for promotions missing category info
+  useEffect(() => {
+    const enrichPromotions = async () => {
+      // Find promotions that need enrichment (missing categoryLabel)
+      const toEnrich = promotions.filter(p => !p.product.categoryLabel && p.product.categories?.length > 0);
+
+      if (toEnrich.length === 0) return;
+
+      setIsEnriching(true);
+
+      // Extract unique products to enrich
+      const productsToEnrich = toEnrich.map(p => p.product);
+      // Deduplicate by ID
+      const uniqueProducts = Array.from(new Map(productsToEnrich.map(p => [p.id, p])).values());
+
+      try {
+        const res = await fetch('/api/products/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(uniqueProducts),
+        });
+
+        if (res.ok) {
+          const enrichedProducts = await res.json();
+
+          // Update promotions with enriched product data
+          setPromotions(prevPromotions => {
+            return prevPromotions.map(promo => {
+              const enriched = enrichedProducts.find((p: Product) => p.id === promo.product.id);
+              if (enriched) {
+                return { ...promo, product: enriched };
+              }
+              return promo;
+            });
+          });
+        }
+      } catch (error) {
+        console.error("Failed to enrich products", error);
+      } finally {
+        setIsEnriching(false);
+      }
+    };
+
+    // Debounce enrichment to avoid too many calls while loading
+    const timer = setTimeout(() => {
+      enrichPromotions();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [promotions]);
 
   const fetchPromotions = async () => {
     setLoading(true);
@@ -134,6 +186,13 @@ export default function Home() {
           <h1 className="text-2xl font-bold text-gray-800">Generatore Volantini</h1>
 
           <div className="flex items-center gap-4">
+            {isEnriching && (
+              <div className="flex items-center gap-2 text-sm text-blue-600 font-medium animate-pulse">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                Caricamento categorie...
+              </div>
+            )}
+
             <div className="flex items-center gap-2 bg-white p-2 rounded shadow-sm">
               <label className="text-sm font-medium text-gray-600">Settimana Volantino:</label>
               <input
@@ -151,13 +210,21 @@ export default function Home() {
 
             <button
               onClick={() => setViewMode(viewMode === 'edit' ? 'preview' : 'edit')}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+              disabled={isEnriching}
+              className={`px-4 py-2 rounded flex items-center gap-2 ${isEnriching
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-200 hover:bg-gray-300'
+                }`}
             >
               {viewMode === 'edit' ? 'Vedi Anteprima' : 'Torna all\'Editor'}
             </button>
             <button
               onClick={handlePrint}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
+              disabled={isEnriching}
+              className={`px-4 py-2 text-white rounded flex items-center gap-2 ${isEnriching
+                  ? 'bg-blue-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700'
+                }`}
             >
               <Printer size={20} /> Stampa / PDF
             </button>
